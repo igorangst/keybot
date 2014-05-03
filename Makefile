@@ -1,9 +1,9 @@
 CC=gcc
-LIBS=-lasound lib/arduino-serial-lib.o
-INCL=-I. -I../arduino-serial 
+LIBS=-lasound arduino-serial/arduino-serial-lib.o
+INCL=-Iarduino-serial -Isrc
 
 EXEC=bin/keybot
-SRC=keybot.c
+SRC=src/keybot.c
 
 default all: keybot
 
@@ -14,4 +14,4 @@ dirs:
 	mkdir -p bin
 
 clean:
-	rm -f $(EXEC) *~
+	rm -f $(EXEC) *~ src/*~
