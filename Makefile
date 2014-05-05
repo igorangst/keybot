@@ -7,11 +7,17 @@ SRC=src/keybot.c
 
 default all: keybot
 
-keybot: dirs $(SRC)
+keybot: dirs arduino-serial/checkout $(SRC)
 	$(CC) -o $(EXEC) $(INCL) $(SRC) $(LIBS)
 
 dirs:
 	mkdir -p bin
 
+arduino-serial/checkout:
+	git submodule init
+	git submodule update
+	touch arduino-serial/checkout
+
 clean:
 	rm -f $(EXEC) *~ src/*~
+

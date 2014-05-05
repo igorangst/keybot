@@ -1,4 +1,10 @@
-/* seqdemo.c by Matthias Nagorni */
+/*****************************************************************
+ * 
+ *
+ * The code in this file is inspired by Matthias Nagorni's example
+ * seqdemo.c, which can be found on his website:
+ * http://turing.suse.de/~mana/
+ ******************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,8 +24,8 @@ snd_seq_t *open_seq() {
     fprintf(stderr, "Error opening ALSA sequencer.\n");
     exit(1);
   }
-  snd_seq_set_client_name(seq_handle, "ALSA Sequencer Demo");
-  if ((portid = snd_seq_create_simple_port(seq_handle, "ALSA Sequencer Demo",
+  snd_seq_set_client_name(seq_handle, "Arduino Keybot");
+  if ((portid = snd_seq_create_simple_port(seq_handle, "Arduino Keybot IN1",
             SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
             SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
     fprintf(stderr, "Error creating sequencer port.\n");
@@ -64,7 +70,56 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 }
 
 
+void usage(){
+  printf ("Usage: keybot [OPTION]\n");
+  printf (" -d dev\tdevice for serial connection to arduino (/dev/ttyACM0)\n");
+  printf (" -b int\tbaud rate for serial connection (9600)\n");
+  printf (" -h    \tprint help message and exit\n");  
+}
+
+
 int main(int argc, char *argv[]) {
+
+  // device for serial connection
+  char dev[256] = "/dev/ttyACM0";
+
+  // baud rate for serial connection
+  int brate = 9600;
+
+  int i;
+  for (i=1; i<argc; ){
+    if (!strcmp(argv[i], "-d")){
+      ++i;
+      if (i>=argc){
+	printf ("ERROR: missing argument for -d option\n");
+	usage();
+	exit(1);
+      }
+      strcpy(dev, argv[i]);
+      ++i;
+      continue;
+    } else if (!strcmp(argv[i], "-b")){
+      ++i;
+      if (i>=argc){
+	printf ("ERROR: missing argument for -b option\n");
+	usage();
+	exit(1);
+      }
+      brate = atoi(argv[i]);
+      if (brate <= 0){
+	printf("ERROR: expecting positive baud rate\n");
+	exit(1);
+      }
+      ++i;
+      continue;
+    } else if (!strcmp(argv[i], "-h")){
+      usage();
+      exit(0);
+    }
+    printf ("ERROR: unknown option or command line argument '%s'\n", argv[i]);
+    usage();
+    exit(1);
+  }
 
   // setup ALSA
   snd_seq_t *seq_handle;
@@ -78,7 +133,11 @@ int main(int argc, char *argv[]) {
 
   // setup serial 
   int fd = -1;
-  fd = serialport_init("/dev/ttyACM0", 9600);
+  fd = serialport_init(dev, brate);
+  if (fd == -1){
+    printf("ERROR: could not open device '%s'\n", dev);
+    exit(1);
+  }
   serialport_flush(fd);
 
   while (1) {
