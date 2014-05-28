@@ -15,7 +15,7 @@
 
 
 snd_seq_t *open_seq();
-int midi_action(snd_seq_t *seq_handle, int serial);
+int midi_action(snd_seq_t *seq_handle);
 
 snd_seq_t *open_seq() {
 
@@ -36,7 +36,26 @@ snd_seq_t *open_seq() {
   return(seq_handle);
 }
 
-int midi_action(snd_seq_t *seq_handle, int serial) {
+int send_byte(int serial, char byte){
+  return 0;
+}
+
+char get_key(unsigned int note){
+  char key  = 0; 
+  switch (note){
+  case 36: key = 1; break;
+  case 38: key = 2; break;
+  case 40: key = 3; break;
+  case 41: key = 4; break;
+  case 43: key = 5; break;
+  case 45: key = 6; break;
+  case 47: key = 7; break;
+  case 48: key = 8; break;
+  }
+  return key;
+}
+
+int midi_action(snd_seq_t *seq_handle) {
 
   snd_seq_event_t *ev;
   int stop = 0;
@@ -44,30 +63,66 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
   do {
     snd_seq_event_input(seq_handle, &ev);
     switch (ev->type) {
-      case SND_SEQ_EVENT_CONTROLLER: 
-        fprintf(stderr, "Control event on Channel %2d: %5d       \r",
-                ev->data.control.channel, ev->data.control.value);
-	stop = 1;
-        break;
-      case SND_SEQ_EVENT_PITCHBEND:
-        fprintf(stderr, "Pitchbender event on Channel %2d: %5d   \r", 
-                ev->data.control.channel, ev->data.control.value);
-	stop = 1;
-        break;
-      case SND_SEQ_EVENT_NOTEON:
-        fprintf(stderr, "Note On event on Channel %2d: %5d       \r",
-                ev->data.control.channel, ev->data.note.note);
-	serialport_writebyte(serial, '1');
-        break;        
-      case SND_SEQ_EVENT_NOTEOFF: 
-        fprintf(stderr, "Note Off event on Channel %2d: %5d      \r",         
-                ev->data.control.channel, ev->data.note.note);           
-	serialport_writebyte(serial, '0');
-        break;        
+    case SND_SEQ_EVENT_CONTROLLER:{ 
+      fprintf(stderr, "Control event on Channel %2d: C%1d = %3d       \r",
+	      ev->data.control.channel, 
+	      ev->data.control.param, 
+	      ev->data.control.value);
+      unsigned int param = ev->data.control.param;
+      int value = ev->data.control.value;
+      
+      if (param == 1){
+	
+	// lower rest position
+	send_byte(1, (char)SET_LO);
+	send_byte(1, (char)value);
+	
+      } else if (param == 2){
+	
+	// upper rest position
+	send_byte(1, (char)SET_HI);
+	send_byte(1, (char)value);
+      }
+      
+      break;
     }
+    case SND_SEQ_EVENT_PITCHBEND:{
+      fprintf(stderr, "Pitchbender event on Channel %2d: %5d   \r", 
+	      ev->data.control.channel, ev->data.control.value);
+      stop = 1;
+      break;
+    }
+    case SND_SEQ_EVENT_NOTEON:{
+      fprintf(stderr, "Note On event on Channel %2d: %5d       \r",
+	      ev->data.control.channel, ev->data.note.note);
+      unsigned int note = ev->data.note.note;
+      char key = get_key(note);
+      if (key){
+	send_byte(1, (char)NOTE_ON);
+	send_byte(1, key);
+      }
+      
+      //	serialport_writebyte(serial, '1');
+      break;
+    }        
+    case SND_SEQ_EVENT_NOTEOFF: {
+      fprintf(stderr, "Note Off event on Channel %2d: %5d      \r",         
+	      ev->data.control.channel, ev->data.note.note);           
+      unsigned int note = ev->data.note.note;
+      char key = get_key(note);
+      if (key){
+	send_byte(1, (char)NOTE_OFF);
+	send_byte(1, key);
+      }
+      //	serialport_writebyte(serial, '0');
+      break;
+    }}
     snd_seq_free_event(ev);
   } while (snd_seq_event_input_pending(seq_handle, 0) > 0);
 
+  if (stop){
+    send_byte(1, (char)PANIC);
+  }
   return stop;
 }
 
@@ -134,19 +189,21 @@ int main(int argc, char *argv[]) {
   snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
 
   // setup serial 
-  int fd = -1;
-  fd = serialport_init(dev, brate);
-  if (fd == -1){
-    printf("ERROR: could not open device '%s'\n", dev);
-    exit(1);
-  }
-  serialport_flush(fd);
+  /* int fd = -1; */
+  /* fd = serialport_init(dev, brate); */
+  /* if (fd == -1){ */
+  /*   printf("ERROR: could not open device '%s'\n", dev); */
+  /*   exit(1); */
+  /* } */
+  /* serialport_flush(fd); */
 
   while (1) {
     if (poll(pfd, npfd, 100000) > 0) {
-      if (midi_action(seq_handle, fd)) break;
+      if (midi_action(seq_handle)) break;
     }  
   }
 
-  serialport_close(fd);
+  printf("exit\n");
+
+  //  serialport_close(fd);
 }
