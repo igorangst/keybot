@@ -1,6 +1,4 @@
 /*****************************************************************
- * 
- *
  * The code in this file is inspired by Matthias Nagorni's example
  * seqdemo.c, which can be found on his website:
  * http://turing.suse.de/~mana/
@@ -36,10 +34,25 @@ snd_seq_t *open_seq() {
   return(seq_handle);
 }
 
+char get_finger(int note){
+  switch (note){
+  case 60: return 0;
+  case 62: return 1;
+  case 64: return 2;
+  case 65: return 3;
+  case 67: return 4;
+  case 69: return 5;
+  case 71: return 6;
+  case 72: return 7;
+  default: return 0xff;
+  }
+}
+
 int midi_action(snd_seq_t *seq_handle, int serial) {
 
   snd_seq_event_t *ev;
   int stop = 0;
+  char finger;
 
   do {
     snd_seq_event_input(seq_handle, &ev);
@@ -57,17 +70,28 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
       case SND_SEQ_EVENT_NOTEON:
         fprintf(stderr, "Note On event on Channel %2d: %5d       \r",
                 ev->data.control.channel, ev->data.note.note);
-	serialport_writebyte(serial, '1');
+	finger = get_finger(ev->data.note.note);
+	if (finger != 0xff){
+	  serialport_writebyte(serial, NOTE_ON);
+	  serialport_writebyte(serial, finger);
+	}
         break;        
       case SND_SEQ_EVENT_NOTEOFF: 
         fprintf(stderr, "Note Off event on Channel %2d: %5d      \r",         
-                ev->data.control.channel, ev->data.note.note);           
-	serialport_writebyte(serial, '0');
+                ev->data.control.channel, ev->data.note.note);
+	finger = get_finger(ev->data.note.note);
+	if (finger != 0xff){
+	  serialport_writebyte(serial, NOTE_OFF);
+	  serialport_writebyte(serial, finger);
+	}
         break;        
     }
     snd_seq_free_event(ev);
   } while (snd_seq_event_input_pending(seq_handle, 0) > 0);
 
+  if (stop) {
+    serialport_writebyte(serial, PANIC);
+  }
   return stop;
 }
 

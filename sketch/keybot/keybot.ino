@@ -28,8 +28,13 @@ void setup()
   
   // initialize fingers
   for (int i=0; i<8; ++i){
-    finger[i].lo_ang = 45;
-    finger[i].hi_ang = 90;
+    if (i%2){
+      finger[i].lo_ang = 45;
+      finger[i].hi_ang = 90;
+    } else {      
+      finger[i].lo_ang = 90;
+      finger[i].hi_ang = 45;
+    }
     finger[i].pressed = false;
     finger[i].servo.attach(i);
   }
