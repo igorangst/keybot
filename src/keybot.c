@@ -44,11 +44,67 @@ char get_finger(int note){
   case 69: return 5;
   case 71: return 6;
   case 72: return 7;
-  default: return 0xff;
+  default: return -1;
   }
 }
 
+void restore_params(int serial){
+  FILE *myFile;
+  myFile = fopen("config", "r");
+
+  //read file into array
+  int numberArray[16];
+  int i;
+
+  if (myFile == NULL) {
+    printf("Error Reading File\n");
+    exit (0);
+  }
+  for (i = 0; i < 16; i++) {
+    fscanf(myFile, "%d,", &numberArray[i] );
+  }
+  printf ("======================================\n");
+  printf ("RESTORE PARAMS FROM CONFIGURATION FILE\n");
+  printf ("======================================\n");
+  for (i = 0; i < 8; i++) {
+    printf ("LO[%i] = %i \t HI[%i] = %i\n", i, numberArray[2*i], i, numberArray[2*i+1]);
+    char lo = (char)numberArray[2*i];
+    char hi = (char)numberArray[2*i+1];
+
+    serialport_writebyte(serial, NOTE_OFF);
+    serialport_writebyte(serial, (char)i);
+    usleep(1000);
+    serialport_writebyte(serial, SET_LO);
+    serialport_writebyte(serial, lo);
+    usleep(1000);
+    serialport_writebyte(serial, SET_HI);
+    serialport_writebyte(serial, hi);
+  }
+  printf ("======================================\n");
+}
+
+void dump_params(int serial){
+  serialport_writebyte(serial, DUMP);
+  char params[256];
+  serialport_read_until(serial, params, DUMP_EOF, 256, 1000000);
+  unsigned i=0;
+
+  printf ("======================================\n");
+  printf ("DUMP PARAMETERS FROM ARDUINO CLIENT   \n");
+  printf ("======================================\n");
+  for (i=0; i<8; ++i){
+    printf("LO[%i] = %i / HI[%i] = %i\n", i, params[2*i], i, params[2*i+1]);
+  }
+  printf ("======================================\n");
+
+  // flush serial
+  serialport_read_until(serial, params, DUMP_EOF, 256, 1000);  
+}
+
 int midi_action(snd_seq_t *seq_handle, int serial) {
+
+  // last event was note on
+  static int note_on = 0; 
 
   snd_seq_event_t *ev;
   int stop = 0;
@@ -60,7 +116,9 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
       case SND_SEQ_EVENT_CONTROLLER: 
         fprintf(stderr, "Control event on Channel %2d: %5d       \r",
                 ev->data.control.channel, ev->data.control.value);
-	stop = 1;
+	char v = ev->data.control.value;
+	serialport_writebyte(serial, note_on ? SET_LO : SET_HI);
+	serialport_writebyte(serial, v);
         break;
       case SND_SEQ_EVENT_PITCHBEND:
         fprintf(stderr, "Pitchbender event on Channel %2d: %5d   \r", 
@@ -71,18 +129,25 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
         fprintf(stderr, "Note On event on Channel %2d: %5d       \r",
                 ev->data.control.channel, ev->data.note.note);
 	finger = get_finger(ev->data.note.note);
-	if (finger != 0xff){
+	fprintf(stderr, "Finger %i     \r", finger);
+	if (finger != -1){
 	  serialport_writebyte(serial, NOTE_ON);
 	  serialport_writebyte(serial, finger);
+	  note_on = 1;	
+	} else {
+	  dump_params(serial);
 	}
         break;        
       case SND_SEQ_EVENT_NOTEOFF: 
         fprintf(stderr, "Note Off event on Channel %2d: %5d      \r",         
                 ev->data.control.channel, ev->data.note.note);
 	finger = get_finger(ev->data.note.note);
-	if (finger != 0xff){
+	if (finger != -1){
 	  serialport_writebyte(serial, NOTE_OFF);
 	  serialport_writebyte(serial, finger);
+	  note_on = 0;
+	} else {
+	  restore_params(serial);
 	}
         break;        
     }
@@ -91,6 +156,7 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 
   if (stop) {
     serialport_writebyte(serial, PANIC);
+    dump_params(serial);
   }
   return stop;
 }

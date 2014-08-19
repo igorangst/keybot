@@ -8,6 +8,8 @@ enum KeybotMessage {
   ALIVE    = 0xaa ,  // heart beat
   SET_LO   = 0x11 ,  // set lower rest position (0 = 180 deg, 127 = 0 deg)
   SET_HI   = 0x12 ,  // set upper rest position (0 = 180 deg, 127 = 0 deg)
+  DUMP     = 0x55 ,  // dump all parameters in (lo,hi) pairs from 0 to 7
+  DUMP_EOF = 0x80    // byte sent to mark end of dump
 };
 
 #endif

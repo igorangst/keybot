@@ -3,9 +3,11 @@
  
 
 typedef struct {
-  int   lo_ang;
-  int   hi_ang;
-  bool  pressed;
+  int   lo_ang;   // lower rest angle
+  int   hi_ang;   // higher rest angle
+  int   lo_param; // for reading out to server
+  int   hi_param; // for reading out to server
+  bool  pressed; 
   Servo servo;
 } Finger;
 
@@ -29,18 +31,31 @@ void setup()
   // initialize fingers
   for (int i=0; i<8; ++i){
     if (i%2){
-      finger[i].lo_ang = 45;
+      
+      // odd fingers turn to 0 degrees
+      finger[i].lo_ang = 70;
       finger[i].hi_ang = 90;
+      
+      finger[i].lo_param = map(finger[i].lo_ang, 90, 45, 127, 0);
+      finger[i].hi_param = map(finger[i].hi_ang, 115, 60, 127, 0);
     } else {      
-      finger[i].lo_ang = 90;
-      finger[i].hi_ang = 45;
+      
+      // even fingers turn to 180 degrees
+      finger[i].lo_ang = 110;
+      finger[i].hi_ang = 90;
+        
+      finger[i].lo_param = map(finger[i].lo_ang, 90, 135, 127, 0);
+      finger[i].hi_param = map(finger[i].hi_ang, 75, 110, 127, 0);
     }
     finger[i].pressed = false;
-    finger[i].servo.attach(i);
+    finger[i].servo.attach(3+i);
   }
   
-  // invalidate current message
-  msg.valid = false;
+  // no key pressed yet
+  last_finger = -1;
+  
+  // invalidate current message and reset servos
+  panic();
 } 
  
 void panic()
@@ -55,6 +70,55 @@ void panic()
   // invalidate message
   msg.valid = false;
 }
+
+
+void set_lo(int param){
+ if (last_finger == -1) return;
+ 
+ int ang = 90;
+  
+ // param is between 0 (= all down) and 127 (= all up at 90 degrees)
+ if (last_finger%2){
+   
+   // odd fingers turn to 0 degrees
+   ang = map(msg.param, 127, 0, 90, 45);
+ } else {
+   
+   // even fingers turn to 180 degrees
+   ang = map(msg.param, 127, 0, 90, 135);
+ }
+ 
+ finger[last_finger].lo_param = param;
+ finger[last_finger].lo_ang = ang;
+ if (finger[last_finger].pressed){
+   finger[last_finger].servo.write(ang);
+ }  
+}
+
+
+void set_hi(int param){
+ if (last_finger == -1) return;
+ 
+ int ang = 90;
+  
+ // param is between 0 (= all down) and 127 (= all up at 90 degrees)
+ if (last_finger%2){
+   
+   // odd fingers turn to 0 degrees
+   ang = map(msg.param, 127, 0, 115, 60);
+ } else {
+   
+   // even fingers turn to 180 degrees
+   ang = map(msg.param, 127, 0, 75, 110);
+ }
+ 
+ finger[last_finger].hi_param = param;
+ finger[last_finger].hi_ang = ang;
+ if (!finger[last_finger].pressed){
+   finger[last_finger].servo.write(ang);
+ }  
+}
+ 
 
 // for serial FSM: next byte is a new message
 bool new_msg = true;
@@ -71,7 +135,7 @@ void serialEvent() {
         
         // byte is event type
         msg.event = inByte;
-        if (inByte == PANIC || inByte == ALIVE){
+        if (inByte == PANIC || inByte == ALIVE || inByte == DUMP){
            msg.valid = true; 
         } else {
            new_msg = false; 
@@ -86,6 +150,8 @@ void serialEvent() {
     }
   }  
 }
+
+
  
 void loop() 
 { 
@@ -103,26 +169,29 @@ void loop()
       finger[k].servo.write(finger[k].lo_ang);
       last_finger = k;
       msg.valid = false;
+      // Serial.println("Note on");
     } else if (msg.event == NOTE_OFF){
       int k = msg.param;
       finger[k].pressed = false;
       finger[k].servo.write(finger[k].hi_ang);
       last_finger = k;
       msg.valid = false;
+      // Serial.println("Note off");
     } else if (msg.event == SET_LO){
-      int ang = msg.param; 
-      finger[last_finger].lo_ang = ang;
-      if (finger[last_finger].pressed){
-        finger[last_finger].servo.write(ang);
-      }
+      set_lo(msg.param);
       msg.valid = false;
+      // Serial.println("Set low rest");
     } else if (msg.event == SET_HI){
-      int ang = msg.param; 
-      finger[last_finger].hi_ang = ang;
-      if (!finger[last_finger].pressed){
-        finger[last_finger].servo.write(ang);
-      }
+      set_hi(msg.param); 
       msg.valid = false;
+      // Serial.println("Set high rest");
+    } else if (msg.event == DUMP){
+       for (int i=0; i<8; ++i){
+          Serial.write(finger[i].lo_param);
+          Serial.write(finger[i].hi_param);
+       } 
+       Serial.write(DUMP_EOF);
+       msg.valid = false;
     }
   }
 } 
