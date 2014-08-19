@@ -1,7 +1,9 @@
 /*****************************************************************
- * The code in this file is inspired by Matthias Nagorni's example
- * seqdemo.c, which can be found on his website:
- * http://turing.suse.de/~mana/
+ * FILE: keybot.c
+ * 
+ * Server for Arduino KeyBot. The code in this file is inspired by
+ * Matthias Nagorni's example seqdemo.c, which can be found on his
+ * website: http://turing.suse.de/~mana/
  ******************************************************************/
 
 #include <stdio.h>
@@ -12,11 +14,17 @@
 #include <message.h>
 
 
+// forward declarations
 snd_seq_t *open_seq();
 int midi_action(snd_seq_t *seq_handle, int serial);
 
-snd_seq_t *open_seq() {
 
+/******************************************************************
+ * Function: snd_seq_t *open_seq()
+ * Open connection to ALSA sequncer, used for all MIDI handling.
+ * @return: handler for ALSA sequencer connection
+ ******************************************************************/
+snd_seq_t *open_seq() {
   snd_seq_t *seq_handle;
   int portid;
 
@@ -34,6 +42,13 @@ snd_seq_t *open_seq() {
   return(seq_handle);
 }
 
+
+/******************************************************************
+ * Function: char get_finger(int note)
+ * Simple conversion from MIDI notes to finger indices. Per default,
+ * the fingers cover the white keys of one octave from C to C.
+ * @return: finger index between -1 (out of range) and 7
+ ******************************************************************/
 char get_finger(int note){
   switch (note){
   case 60: return 0;
@@ -48,6 +63,13 @@ char get_finger(int note){
   }
 }
 
+
+/******************************************************************
+ * Function: void restore_params(int serial)
+ * Reads parameters from config file and sets the keybot client
+ * accordingly. Parameters are lo and hi rest positions.
+ * @param serial: handler for serial connection to arduino
+ ******************************************************************/
 void restore_params(int serial){
   FILE *myFile;
   myFile = fopen("config", "r");
@@ -83,6 +105,14 @@ void restore_params(int serial){
   printf ("======================================\n");
 }
 
+
+/******************************************************************
+ * Function: void dump_params(int serial)
+ * Ask the arduino client to transfer parameters over serial line.
+ * Parameters are lo and hi rest positions. The transfer is ended
+ * by a DUMP_EOF symbol.
+ * @param serial: handler for serial connection to arduino
+ ******************************************************************/
 void dump_params(int serial){
   serialport_writebyte(serial, DUMP);
   char params[256];
@@ -101,6 +131,15 @@ void dump_params(int serial){
   serialport_read_until(serial, params, DUMP_EOF, 256, 1000);  
 }
 
+
+/******************************************************************
+ * Function: int midi_action(snd_seq_t *seq_handle, int serial)
+ * Main function to handle MIDI events. Sends control messages to
+ * the arduino client
+ * @param seq_handle: handler for ALSA connection 
+ * @param serial    : handler for serial connection to arduino
+ * @return          : returns 1 if an error or stop occurred
+ ******************************************************************/
 int midi_action(snd_seq_t *seq_handle, int serial) {
 
   // last event was note on
@@ -110,9 +149,12 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
   int stop = 0;
   char finger;
 
+  // loop while new MIDI events are in the queue
   do {
     snd_seq_event_input(seq_handle, &ev);
     switch (ev->type) {
+
+      // controller events are used to set the rest positions
       case SND_SEQ_EVENT_CONTROLLER: 
         fprintf(stderr, "Control event on Channel %2d: %5d       \r",
                 ev->data.control.channel, ev->data.control.value);
@@ -121,11 +163,15 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 	serialport_writebyte(serial, v);
         break;
       case SND_SEQ_EVENT_PITCHBEND:
+
+	// for now, pitch bend will stop the server process
         fprintf(stderr, "Pitchbender event on Channel %2d: %5d   \r", 
                 ev->data.control.channel, ev->data.control.value);
 	stop = 1;
         break;
       case SND_SEQ_EVENT_NOTEON:
+
+	// play a note (if it is in range)
         fprintf(stderr, "Note On event on Channel %2d: %5d       \r",
                 ev->data.control.channel, ev->data.note.note);
 	finger = get_finger(ev->data.note.note);
@@ -139,6 +185,8 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 	}
         break;        
       case SND_SEQ_EVENT_NOTEOFF: 
+
+	// release note (if it is in range)
         fprintf(stderr, "Note Off event on Channel %2d: %5d      \r",         
                 ev->data.control.channel, ev->data.note.note);
 	finger = get_finger(ev->data.note.note);
@@ -155,6 +203,8 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
   } while (snd_seq_event_input_pending(seq_handle, 0) > 0);
 
   if (stop) {
+    
+    // bring client to safe position
     serialport_writebyte(serial, PANIC);
     dump_params(serial);
   }
@@ -162,6 +212,10 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 }
 
 
+/******************************************************************
+ * Function: usage()
+ * Print usage message on stdout.
+ ******************************************************************/
 void usage(){
   printf ("Usage: keybot [OPTION]\n");
   printf (" -d dev\tdevice for serial connection to arduino (/dev/ttyACM0)\n");
@@ -170,6 +224,10 @@ void usage(){
 }
 
 
+/******************************************************************
+ * Function: main()
+ * What do you think it does?
+ ******************************************************************/
 int main(int argc, char *argv[]) {
 
   // device for serial connection
@@ -178,6 +236,7 @@ int main(int argc, char *argv[]) {
   // baud rate for serial connection
   int brate = 9600;
 
+  // process command line arguments
   int i;
   for (i=1; i<argc; ){
     if (!strcmp(argv[i], "-d")){
@@ -215,10 +274,9 @@ int main(int argc, char *argv[]) {
 
   // setup ALSA
   snd_seq_t *seq_handle;
+  seq_handle = open_seq(); // FIXME: flush MIDI events 
   int npfd;
   struct pollfd *pfd;
-    
-  seq_handle = open_seq();
   npfd = snd_seq_poll_descriptors_count(seq_handle, POLLIN);
   pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
   snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
@@ -232,11 +290,13 @@ int main(int argc, char *argv[]) {
   }
   serialport_flush(fd);
 
+  // main loop processing MIDI events
   while (1) {
     if (poll(pfd, npfd, 100000) > 0) {
       if (midi_action(seq_handle, fd)) break;
     }  
   }
 
+  // clean up
   serialport_close(fd);
 }

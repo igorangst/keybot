@@ -1,0 +1,32 @@
+========================
+Arduino KeyBot TODO list
+========================
+
+1. Fixes and easy to implement features
+---------------------------------------
+
+* Fix serial comunication
+   The client freezes on parameter restore, what's going on?
+* Save and restore
+   Finish saving and restoring of parameters.
+* MIDI channel
+   Add option to restrict the MIDI channel that we listen on.
+* Set rest positions
+   Maybe change SET_LO and SET_HI messages to three bytes, including
+   the index of the finger to set. This will make the interface
+   cleaner and allow the server to take over the logic to select the
+   finger to configure.
+
+
+2. Ideas for future improvements
+--------------------------------
+
+* Auto calibration
+   Use acoustic sensor to detect key presses and set the lower rest
+   positions automatically. Hi rest positions can then be set to a
+   constant offset angle from the lo rest positions.
+* GUI
+   Add a nice gui. At this time, there is not really a need for this,
+   but it might come in handy later.
+* More keys
+   Make the whole design scalable for more keys, or add black keys.
