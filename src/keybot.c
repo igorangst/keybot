@@ -1,9 +1,11 @@
 /*****************************************************************
- * FILE: keybot.c
+ * FILE  : keybot.c
+ * AUTHOR: Igor Angst (http://github.com/igorangst)
  * 
- * Server for Arduino KeyBot. The code in this file is inspired by
- * Matthias Nagorni's example seqdemo.c, which can be found on his
- * website: http://turing.suse.de/~mana/
+ * DESCR : Server for Arduino KeyBot. The ALSA communication code in
+ *         this file is inspired by Matthias Nagorni's example
+ *         seqdemo.c, which can be found on his website:
+ *         http://turing.suse.de/~mana/
  ******************************************************************/
 
 #include <stdio.h>
@@ -13,6 +15,9 @@
 #include <arduino-serial-lib.h>
 #include <message.h>
 
+
+// global settings
+int midi_chan = 16;
 
 // forward declarations
 snd_seq_t *open_seq();
@@ -133,6 +138,24 @@ void dump_params(int serial){
 
 
 /******************************************************************
+ * Function: int drop_event(snd_seq_event_t *ev){
+ * Check if an event is on a channel we are listening on
+ * @param ev: event to check
+ * @return  : returns 1 if the event should be dropped, 0 otherwise
+ ******************************************************************/
+int drop_event(snd_seq_event_t *ev){
+
+  // all channels on?
+  if (midi_chan == 16){
+    return 0;
+  }
+  
+  int chan = ev->data.control.channel;
+  return (chan == midi_chan);
+}
+
+
+/******************************************************************
  * Function: int midi_action(snd_seq_t *seq_handle, int serial)
  * Main function to handle MIDI events. Sends control messages to
  * the arduino client
@@ -152,6 +175,14 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
   // loop while new MIDI events are in the queue
   do {
     snd_seq_event_input(seq_handle, &ev);
+
+    // filter events on other channels
+    if (drop_event(ev)) {
+      snd_seq_free_event(ev);
+      continue;
+    }
+
+    // process event
     switch (ev->type) {
 
       // controller events are used to set the rest positions
@@ -220,6 +251,7 @@ void usage(){
   printf ("Usage: keybot [OPTION]\n");
   printf (" -d dev\tdevice for serial connection to arduino (/dev/ttyACM0)\n");
   printf (" -b int\tbaud rate for serial connection (9600)\n");
+  printf (" -c chan\tMIDI channel to listen on (default all = 16)\n");
   printf (" -h    \tprint help message and exit\n");  
 }
 
@@ -259,6 +291,20 @@ int main(int argc, char *argv[]) {
       brate = atoi(argv[i]);
       if (brate <= 0){
 	printf("ERROR: expecting positive baud rate\n");
+	exit(1);
+      }
+      ++i;
+      continue;
+    } else if (!strcmp(argv[i], "-c")){
+      ++i;
+      if (i>=argc){
+	printf ("ERROR: missing argument for -c option\n");
+	usage();
+	exit(1);
+      }
+      midi_chan = atoi(argv[i]);
+      if (midi_chan < 0 || midi_chan > 16){
+	printf("ERROR: illegal MIDI channel number: %i\n", midi_chan);
 	exit(1);
       }
       ++i;

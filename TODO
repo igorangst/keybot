@@ -9,13 +9,14 @@ Arduino KeyBot TODO list
    The client freezes on parameter restore, what's going on?
 * Save and restore
    Finish saving and restoring of parameters.
-* MIDI channel
-   Add option to restrict the MIDI channel that we listen on.
 * Set rest positions
    Maybe change SET_LO and SET_HI messages to three bytes, including
    the index of the finger to set. This will make the interface
    cleaner and allow the server to take over the logic to select the
    finger to configure.
+* Documentation
+   Add instructions on how to build the bot, and some nice pictures or
+   videos.
 
 
 2. Ideas for future improvements
