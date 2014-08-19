@@ -11,18 +11,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 #include <alsa/asoundlib.h>
 #include <arduino-serial-lib.h>
 #include <message.h>
 
 
 // global settings
-int midi_chan = 0;  // 0 == all channels
+int  midi_chan = 0;     // 0 == all channels
+char config_file[256];
 
 // forward declarations
 snd_seq_t *open_seq();
 int midi_action(snd_seq_t *seq_handle, int serial);
 
+// will be set when ctrl-c is intercepted
+int sig_exit = 0;
+
+// signal handler for ctrl-c
+void intHandler(int dummy) {
+  sig_exit = 1;
+}
 
 /******************************************************************
  * Function: snd_seq_t *open_seq()
@@ -77,7 +86,7 @@ char get_finger(int note){
  ******************************************************************/
 void restore_params(int serial){
   FILE *myFile;
-  myFile = fopen("config", "r");
+  myFile = fopen(config_file, "r");
 
   //read file into array
   int numberArray[16];
@@ -122,19 +131,29 @@ void restore_params(int serial){
  * @param serial: handler for serial connection to arduino
  ******************************************************************/
 void dump_params(int serial){
-  serialport_writebyte(serial, DUMP);
-  char params[256];
-  serialport_read_until(serial, params, DUMP_EOF, 256, 5000);
-  unsigned i=0;
+  char params[256];  
 
+  serialport_writebyte(serial, DUMP);
+  usleep(1000);
+  serialport_read_until(serial, params, DUMP_EOF, 256, 5000);
+  
   printf ("======================================\n");
-  printf ("DUMP PARAMETERS FROM ARDUINO CLIENT   \n");
+  printf ("STORE PARAMETERS FROM ARDUINO CLIENT   \n");
   printf ("======================================\n");
+
+  FILE *myFile;
+  myFile = fopen(config_file, "w");
+
+  unsigned i=0;
   for (i=0; i<8; ++i){
-    printf("LO[%i] = %i / HI[%i] = %i\n", i, params[2*i], i, params[2*i+1]);
+    int lo = params[2*i];
+    int hi = params[2*i+1];
+    printf("LO[%i] = %i / HI[%i] = %i\n", i, lo, i, hi);
+    fprintf(myFile, "%i %i ", lo, hi); 
   }
   printf ("======================================\n");
 
+  fclose(myFile);
   // flush serial
   // serialport_read_until(serial, params, DUMP_EOF, 256, 1000);  
 }
@@ -230,7 +249,7 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 	  serialport_writebyte(serial, finger);
 	  note_on = 0;
 	} 
-        break;        
+        break;
     }
     snd_seq_free_event(ev);
   } while (snd_seq_event_input_pending(seq_handle, 0) > 0);
@@ -255,6 +274,8 @@ void usage(){
   printf (" -b int\tbaud rate for serial connection (9600)\n");
   printf (" -c chan\tMIDI channel to listen on (default all)\n");
   printf (" -r    \trestore params from config file on startup\n");
+  printf (" -s    \tstore params on exit\n");
+  printf (" -f file\tuse config file for params\n");
   printf (" -h    \tprint help message and exit\n");  
 }
 
@@ -271,8 +292,10 @@ int main(int argc, char *argv[]) {
   // baud rate for serial connection
   int brate = 9600;
 
-  // restore parameter on startup
+  // restore/stpre parameter on startup/exit
   int restore = 0;
+  int store = 0;
+  strcpy(config_file, "keybot.conf");
 
   // process command line arguments
   int i;
@@ -319,6 +342,20 @@ int main(int argc, char *argv[]) {
       restore = 1;
       ++i;
       continue;
+    } else if (!strcmp(argv[i], "-s")){
+      store = 1;
+      ++i;
+      continue;
+    } else if (!strcmp(argv[i], "-f")){
+      ++i;
+      if (i>=argc){
+	printf ("ERROR: missing argument for -f option\n");
+	usage();
+	exit(1);
+      }
+      strcpy(config_file, argv[i]);
+      ++i;
+      continue;
     } else if (!strcmp(argv[i], "-h")){
       usage();
       exit(0);
@@ -344,17 +381,25 @@ int main(int argc, char *argv[]) {
     printf("ERROR: could not open device '%s'\n", dev);
     exit(1);
   }
+  usleep(1000);
   serialport_flush(fd);
 
   if (restore){
     restore_params(fd);
   }
 
+  // set signal handler for ctrl-c
+  signal(SIGINT, intHandler);
+
   // main loop processing MIDI events
-  while (1) {
+  while (!sig_exit) {
     if (poll(pfd, npfd, 100000) > 0) {
       if (midi_action(seq_handle, fd)) break;
     }  
+  }
+
+  if (store){
+    dump_params(fd);
   }
 
   // clean up
