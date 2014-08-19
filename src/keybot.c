@@ -17,7 +17,7 @@
 
 
 // global settings
-int midi_chan = 16;
+int midi_chan = 0;  // 0 == all channels
 
 // forward declarations
 snd_seq_t *open_seq();
@@ -94,17 +94,20 @@ void restore_params(int serial){
   printf ("RESTORE PARAMS FROM CONFIGURATION FILE\n");
   printf ("======================================\n");
   for (i = 0; i < 8; i++) {
-    printf ("LO[%i] = %i \t HI[%i] = %i\n", i, numberArray[2*i], i, numberArray[2*i+1]);
     char lo = (char)numberArray[2*i];
     char hi = (char)numberArray[2*i+1];
+    printf ("LO[%i] = %i \t HI[%i] = %i\n", i, lo, i, hi);
 
     serialport_writebyte(serial, NOTE_OFF);
+    usleep(1000);
     serialport_writebyte(serial, (char)i);
     usleep(1000);
     serialport_writebyte(serial, SET_LO);
+    usleep(1000);
     serialport_writebyte(serial, lo);
     usleep(1000);
     serialport_writebyte(serial, SET_HI);
+    usleep(1000);
     serialport_writebyte(serial, hi);
   }
   printf ("======================================\n");
@@ -121,7 +124,7 @@ void restore_params(int serial){
 void dump_params(int serial){
   serialport_writebyte(serial, DUMP);
   char params[256];
-  serialport_read_until(serial, params, DUMP_EOF, 256, 1000000);
+  serialport_read_until(serial, params, DUMP_EOF, 256, 5000);
   unsigned i=0;
 
   printf ("======================================\n");
@@ -133,7 +136,7 @@ void dump_params(int serial){
   printf ("======================================\n");
 
   // flush serial
-  serialport_read_until(serial, params, DUMP_EOF, 256, 1000);  
+  // serialport_read_until(serial, params, DUMP_EOF, 256, 1000);  
 }
 
 
@@ -146,12 +149,12 @@ void dump_params(int serial){
 int drop_event(snd_seq_event_t *ev){
 
   // all channels on?
-  if (midi_chan == 16){
+  if (midi_chan == 0){
     return 0;
   }
   
   int chan = ev->data.control.channel;
-  return (chan == midi_chan);
+  return (chan + 1 != midi_chan);
 }
 
 
@@ -191,6 +194,7 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
                 ev->data.control.channel, ev->data.control.value);
 	char v = ev->data.control.value;
 	serialport_writebyte(serial, note_on ? SET_LO : SET_HI);
+	usleep(1000);
 	serialport_writebyte(serial, v);
         break;
       case SND_SEQ_EVENT_PITCHBEND:
@@ -209,11 +213,10 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 	fprintf(stderr, "Finger %i     \r", finger);
 	if (finger != -1){
 	  serialport_writebyte(serial, NOTE_ON);
+	  usleep(1000);
 	  serialport_writebyte(serial, finger);
 	  note_on = 1;	
-	} else {
-	  dump_params(serial);
-	}
+	} 
         break;        
       case SND_SEQ_EVENT_NOTEOFF: 
 
@@ -223,11 +226,10 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 	finger = get_finger(ev->data.note.note);
 	if (finger != -1){
 	  serialport_writebyte(serial, NOTE_OFF);
+	  usleep(1000);
 	  serialport_writebyte(serial, finger);
 	  note_on = 0;
-	} else {
-	  restore_params(serial);
-	}
+	} 
         break;        
     }
     snd_seq_free_event(ev);
@@ -251,7 +253,8 @@ void usage(){
   printf ("Usage: keybot [OPTION]\n");
   printf (" -d dev\tdevice for serial connection to arduino (/dev/ttyACM0)\n");
   printf (" -b int\tbaud rate for serial connection (9600)\n");
-  printf (" -c chan\tMIDI channel to listen on (default all = 16)\n");
+  printf (" -c chan\tMIDI channel to listen on (default all)\n");
+  printf (" -r    \trestore params from config file on startup\n");
   printf (" -h    \tprint help message and exit\n");  
 }
 
@@ -267,6 +270,9 @@ int main(int argc, char *argv[]) {
 
   // baud rate for serial connection
   int brate = 9600;
+
+  // restore parameter on startup
+  int restore = 0;
 
   // process command line arguments
   int i;
@@ -309,6 +315,10 @@ int main(int argc, char *argv[]) {
       }
       ++i;
       continue;
+    } else if (!strcmp(argv[i], "-r")){
+      restore = 1;
+      ++i;
+      continue;
     } else if (!strcmp(argv[i], "-h")){
       usage();
       exit(0);
@@ -335,6 +345,10 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   serialport_flush(fd);
+
+  if (restore){
+    restore_params(fd);
+  }
 
   // main loop processing MIDI events
   while (1) {
