@@ -18,15 +18,21 @@ typedef struct {
 } Message;
 
 
-Finger finger[8];    // array of fingers
-int    last_finger;  // last finger moved for calibration
-Message msg;         // current message to be processed
+Finger  finger[8];       // array of fingers
+int     last_finger;     // last finger moved for calibration
+
+bool    new_msg = true;  // for serial FSM: next byte is a new message
+Message msg;             // current message to be processed
+
+bool          pending = false;  // incomplete message pending 
+unsigned long pending_since;    // milliseconds since message pending
  
  
 void setup() 
 { 
   // initialize serial connection to host
   Serial.begin(9600);
+  Serial.flush();
   
   // initialize fingers
   for (int i=0; i<8; ++i){
@@ -57,18 +63,42 @@ void setup()
   // invalidate current message and reset servos
   panic();
 } 
+
+
+// avoid freezing by invalidating incomplete messages after time out
+void drop_message()
+{
+  if (pending){
+    
+    unsigned long duration = millis() - pending_since;
+    
+    if (duration > 100) {
+      
+      // no completion for 100 ms -> drop message
+      pending = false;
+      new_msg = true;
+    }
+  } else if (!new_msg){
+   
+     // incomplete message -> remember
+     pending = true; 
+     pending_since = millis();
+  }
+}
+
  
 void panic()
 {
-  
   // all notes off
   for (int i=0; i<8; ++i){
     finger[i].pressed = false;
     finger[i].servo.write(finger[i].hi_ang);
-  }
+   }
   
   // invalidate message
   msg.valid = false;
+  new_msg = true;
+  pending = false;
 }
 
 
@@ -120,8 +150,6 @@ void set_hi(int param){
 }
  
 
-// for serial FSM: next byte is a new message
-bool new_msg = true;
 
 void serialEvent() {
 
@@ -146,6 +174,9 @@ void serialEvent() {
         msg.param = inByte;
         msg.valid = true;
         new_msg = true;
+        
+        // message is complete
+        pending = false;
       } 
     }
   }  
@@ -190,8 +221,11 @@ void loop()
           Serial.write(finger[i].lo_param);
           Serial.write(finger[i].hi_param);
        } 
-       Serial.write(DUMP_EOF);
+       Serial.write(DUMP_EOF);     
        msg.valid = false;
     }
   }
-} 
+  
+  // invalidate incomplete messages after 100 ms
+  drop_message();
+}
