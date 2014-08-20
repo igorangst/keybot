@@ -278,11 +278,11 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
  ******************************************************************/
 void usage(){
   printf ("Usage: keybot [OPTION]\n");
-  printf (" -d dev  \tdevice for serial connection to arduino (/dev/ttyACM0)\n");
-  printf (" -b int  \tbaud rate for serial connection (9600)\n");
+  printf (" -d dev  \tdevice for serial connection to arduino (default /dev/ttyACM0)\n");
+  printf (" -b int  \tbaud rate for serial connection (default 9600)\n");
   printf (" -c chan \tMIDI channel to listen on (default all)\n");
   printf (" -r      \trestore params from config file on startup (default off)\n");
-  printf (" -s      \tstore params to confid on exit (default off)\n");
+  printf (" -s      \tstore params to config file on exit (default off)\n");
   printf (" -f file \tuse config file for params (default keybot.conf)\n");
   printf (" -l      \tlock params, ignore MIDI controller messages (default unlocked)\n");
   printf (" -h      \tprint help message and exit\n");  
