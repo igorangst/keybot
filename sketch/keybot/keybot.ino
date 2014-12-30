@@ -1,6 +1,8 @@
 #include <Servo.h> 
 #include "message.h"
  
+ 
+ 
 
 typedef struct {
   int   lo_ang;   // lower rest angle
@@ -26,10 +28,21 @@ Message msg;             // current message to be processed
 
 bool          pending = false;  // incomplete message pending 
 unsigned long pending_since;    // milliseconds since message pending
+
+int redPin   = 2;
+int greenPin = 12;
+int bluePin  = 11;
  
+int color = 0; 
  
 void setup() 
 { 
+  
+  // set LED pins
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);  
+  pinMode(bluePin, OUTPUT); 
+  
   // initialize serial connection to host
   Serial.begin(9600);
   Serial.flush();
@@ -62,6 +75,9 @@ void setup()
   
   // invalidate current message and reset servos
   panic();
+  
+  setColor(color, 0, 0);
+  color = (color + 1) % 256;
 } 
 
 
@@ -163,7 +179,7 @@ void serialEvent() {
         
         // byte is event type
         msg.event = inByte;
-        if (inByte == PANIC || inByte == ALIVE || inByte == DUMP){
+        if (inByte == PANIC || inByte == ALIVE || inByte == DUMP || inByte == WHORU){
            msg.valid = true; 
         } else {
            new_msg = false; 
@@ -183,6 +199,13 @@ void serialEvent() {
 }
 
 
+void setColor(int red, int green, int blue)
+{
+  analogWrite(redPin,   red);
+  analogWrite(greenPin, green);
+  analogWrite(bluePin,  blue);
+}
+
  
 void loop() 
 { 
@@ -191,7 +214,7 @@ void loop()
        panic(); 
        msg.valid = false;
     } else if (msg.event == ALIVE){
-      
+
       // FIXME: reset timer here for heart beat function
       msg.valid = false;      
     } else if (msg.event == NOTE_ON){
@@ -223,8 +246,14 @@ void loop()
        } 
        Serial.write(DUMP_EOF);     
        msg.valid = false;
+    }  else if (msg.event == WHORU){
+       Serial.write(KEYBOT); 
+       Serial.write(IAM);
+       msg.valid = false; 
     }
   }
+ 
+  
   
   // invalidate incomplete messages after 100 ms
   drop_message();

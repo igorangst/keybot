@@ -15,6 +15,7 @@
 #include <alsa/asoundlib.h>
 #include <arduino-serial-lib.h>
 #include <message.h>
+#include <client.h>
 
 
 // ======================================================={ global options
@@ -136,7 +137,11 @@ void dump_params(int serial){
 
   serialport_writebyte(serial, DUMP);
   usleep(1000);
-  serialport_read_until(serial, params, DUMP_EOF, 256, 5000);
+  int n = serialport_read_until(serial, params, DUMP_EOF, 256, 1000);
+  if (n == -1) {
+    printf("\rCould not get parameters from client. Read transaction timed out.\n");
+    return;
+  }
 
   FILE *myFile;
   myFile = fopen(config_file, "w");
@@ -240,11 +245,12 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
 	fprintf(stderr, "Finger %i     \r", finger);
 	if (finger != -1){
 	  serialport_writebyte(serial, NOTE_ON);
+	  // serialport_writebyte(serial, 132);
 	  usleep(1000);
 	  serialport_writebyte(serial, finger);
 	  note_on = 1;	
 	} 
-        break;        
+	break;        
       case SND_SEQ_EVENT_NOTEOFF: 
 
 	// release note (if it is in range)
@@ -278,8 +284,8 @@ int midi_action(snd_seq_t *seq_handle, int serial) {
  ******************************************************************/
 void usage(){
   printf ("Usage: keybot [OPTION]\n");
-  printf (" -d dev  \tdevice for serial connection to arduino (default /dev/ttyACM0)\n");
-  printf (" -b int  \tbaud rate for serial connection (default 9600)\n");
+  printf (" -d dev  \tdevice for serial connection to arduino (default /dev/ttyACM*)\n");
+  printf (" -b int  \tbaud rate for serial connection (default 57600)\n");
   printf (" -c chan \tMIDI channel to listen on (default all)\n");
   printf (" -r      \trestore params from config file on startup (default off)\n");
   printf (" -s      \tstore params to config file on exit (default off)\n");
@@ -389,16 +395,17 @@ int main(int argc, char *argv[]) {
   snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
   printf("Connected to ALSA sequencer.\n");
 
-  // setup serial connection to arduino
-  int serial = -1;
-  serial = serialport_init(dev, brate);
+  // connect to client
+  int serial = open_serial(dev, brate);
   if (serial == -1){
-    printf("ERROR: could not open device '%s'\n", dev);
-    exit(1);
+    printf("ERROR: Could not connect to client via '%s'\n", dev);
+    exit(-1);
   }
-  usleep(1000);
-  serialport_flush(serial);
-  printf("Connected to Arduino KeyBot.\n");
+  ClientType t = probe(serial);
+  if (t != KEYBOT){
+    printf("ERROR: Incompatible client on device '%s'\n", dev);
+    exit(-1);
+  }
 
   if (restore){
     restore_params(serial);
@@ -420,7 +427,7 @@ int main(int argc, char *argv[]) {
   }
 
   // clean up
-  serialport_close(serial);
+  close_serial(serial);
   snd_seq_close(seq_handle);
   printf("\rGood bye!                                       \n");
   exit(0);
