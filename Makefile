@@ -2,21 +2,24 @@ CC=gcc
 LIBS=-lasound arduino-serial/arduino-serial-lib.o
 INCL=-Iarduino-serial -Isrc
 
-EXEC=bin/keybot
-SRC=src/keybot.c
-TEST=src/test.c
+EXEC=bin/mubot
+MAIN=src/main.c
+SRCS=src/keybot.c src/midi.c src/options.c
+OBJS=$(subst .c,.o,$(SRCS))
 CONFIG=~/.keybot/config
 
-default all: keybot
+default all: mubot
 
-keybot: dirs arduino-serial/checkout $(SRC)
-	$(CC) -o $(EXEC) $(INCL) $(SRC) $(LIBS)
+mubot: dirs arduino-serial/checkout $(SRC) exec
 
-test: dirs $(TEST)
-	$(CC) -o bin/test $(INCL) $(TEST) $(LIBS)
+exec: $(MAIN) $(OBJS)
+	$(CC) -o $(EXEC) $(INCL) $(MAIN) $(OBJS) $(LIBS)
 
 dirs:
 	mkdir -p bin
+
+%.o: %.c
+	$(CC) -c -o $@ $< $(INCL)
 
 arduino-serial/checkout:
 	git submodule init

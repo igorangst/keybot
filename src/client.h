@@ -9,7 +9,7 @@ typedef struct
   int port;        // ALSA port id associated with this client
   int serial;      // serial port id associated with this client
   ClientType type; // keybot, drumbot, ...
-} KeybotClient;
+} MubotClient;
 
 
 ClientType probe(int serial) {
