@@ -109,6 +109,8 @@ void dump_params(int serial){
 
 
 int keybot_event(snd_seq_event_t *ev, int serial){
+  printf("KE{\n");
+
   char finger;
   int stop = 0;
 
@@ -140,8 +142,7 @@ int keybot_event(snd_seq_event_t *ev, int serial){
     fprintf(stderr, "[ NOTE ON   (%5d) on channel %2d ]      \r",
 	    ev->data.note.note, ev->data.control.channel);
     finger = get_finger(ev->data.note.note);
-    fprintf(stderr, "Finger %i     \r", finger);
-    if (finger != -1){
+     if (finger != -1){
       serialport_writebyte(serial, NOTE_ON);
       // serialport_writebyte(serial, 132);
       usleep(1000);
@@ -172,6 +173,7 @@ int keybot_event(snd_seq_event_t *ev, int serial){
     dump_params(serial);
   }
 
+  printf("}KE\n");
   return stop;
 }
 

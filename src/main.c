@@ -30,44 +30,9 @@ int sig_exit = 0;
 
 // signal handler for ctrl-c
 void intHandler(int dummy) {
+
+  // FIXME: Clean up here
   sig_exit = 1;
-}
-
-
-/******************************************************************
- * Function: int midi_action(snd_seq_t *seq_handle, int serial)
- * Main function to handle MIDI events. Sends control messages to
- * the arduino client
- * @param seq_handle: handler for ALSA connection 
- * @param serial    : handler for serial connection to arduino
- * @return          : returns 1 if an error or stop occurred
- ******************************************************************/
-int midi_action(snd_seq_t *seq_handle, int serial) {
-
-  snd_seq_event_t *ev;
-  int stop = 0;
-
-  // loop while new MIDI events are in the queue
-  do {
-    snd_seq_event_input(seq_handle, &ev);
-
-    // filter events on other channels
-    if (drop_event(ev)) {
-      snd_seq_free_event(ev);
-      continue;
-    }
-
-    // lookup target client
-    char client = ev->dest.client;
-    char port = ev->dest.port;
-
-    printf("Dest: (%i,%i)\n", client, port);
-    stop =  keybot_event(ev, serial);
-  } while (snd_seq_event_input_pending(seq_handle, 0) > 0 
-	   && !stop 
-	   && !sig_exit);
-  
-  return stop; 
 }
 
 
@@ -179,49 +144,36 @@ int main(int argc, char *argv[]) {
   parse_args(argc, argv);
 
   // setup ALSA
-  snd_seq_t *seq_handle;
-  seq_handle = open_seq(); 
-  snd_seq_drop_input(seq_handle);
-  int npfd;
-  struct pollfd *pfd;
-  npfd = snd_seq_poll_descriptors_count(seq_handle, POLLIN);
-  pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
-  snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
-  printf("Connected to ALSA sequencer.\n");
+  init_alsa();
 
-  // connect to client
-  int serial = open_serial(dev, brate);
-  if (serial == -1){
-    printf("ERROR: Could not connect to client via '%s'\n", dev);
-    exit(-1);
-  }
-  ClientType t = probe(serial);
-  if (t != KEYBOT){
-    printf("ERROR: Incompatible client on device '%s'\n", dev);
+  // connect to clients
+  detect_clients();
+  if (nclients == 0){
+    printf("ERROR: Could not detect any client devices.\n");
     exit(-1);
   }
 
   if (mubot_options.restore){
-    restore_params(serial);
+    restore_params(clients[0].serial);
   }
 
   // set signal handler for ctrl-c
-  signal(SIGINT, intHandler);
+  // signal(SIGINT, intHandler);
 
   // main loop processing MIDI events
   printf("Let us hear some muzak!\n");
   while (!sig_exit) {
     if (poll(pfd, npfd, 100000) > 0) {
-      if (midi_action(seq_handle, serial)) break;
+      if (midi_action(seq_handle)) break;
     }  
   }
 
   if (mubot_options.store){
-    dump_params(serial);
+    dump_params(clients[0].serial);
   }
 
   // clean up
-  close_serial(serial);
+  close_serial(clients[0].serial);
   snd_seq_close(seq_handle);
   printf("\rGood bye!                                       \n");
   exit(0);

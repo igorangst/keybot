@@ -4,7 +4,7 @@ INCL=-Iarduino-serial -Isrc
 
 EXEC=bin/mubot
 MAIN=src/main.c
-SRCS=src/keybot.c src/midi.c src/options.c
+SRCS=src/keybot.c src/midi.c src/options.c src/client.c src/serial.c
 OBJS=$(subst .c,.o,$(SRCS))
 CONFIG=~/.keybot/config
 
@@ -27,7 +27,7 @@ arduino-serial/checkout:
 	touch arduino-serial/checkout
 
 clean:
-	rm -f $(EXEC) *~ src/*~
+	rm -f $(EXEC) $(OBJS) *~ src/*~
 
 config:
 	if [ ! -d ~/.keybot ] ; \
