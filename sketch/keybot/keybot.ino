@@ -1,8 +1,7 @@
 #include <Servo.h> 
 #include "message.h"
  
- 
- 
+
 
 typedef struct {
   int   lo_ang;   // lower rest angle

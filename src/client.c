@@ -66,7 +66,10 @@ void detect_clients(){
 	  clients[nclients].port = open_port("KeyBot IN");
 	  nclients++;
 	} else if (t == DRUMBOT){
-	  close_serial(serial);
+	  clients[nclients].type = DRUMBOT;
+	  clients[nclients].serial = serial;
+	  clients[nclients].port = open_port("DrumBot IN");
+	  nclients++;	 
 	}
       }
     }

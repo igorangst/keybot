@@ -18,7 +18,7 @@ snd_seq_t *open_seq() {
     fprintf(stderr, "Error opening ALSA sequencer.\n");
     exit(1);
   }
-  snd_seq_set_client_name(seq_handle, "Arduino Keybot");
+  snd_seq_set_client_name(seq_handle, "Arduino MuBot");
   return(seq_handle);
 }
 
@@ -95,6 +95,9 @@ int midi_action(snd_seq_t *seq_handle) {
 	ClientType t = clients[i].type;
 	if (t == KEYBOT){
 	  stop =  keybot_event(ev, serial);
+	  break;
+	} else  if (t == DRUMBOT){
+	  stop = drumbot_event(ev, serial);
 	  break;
 	}
       }
