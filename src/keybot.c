@@ -1,5 +1,7 @@
 #include "keybot.h"
 
+char note2finger[8]; // will be initialized in setup_keybot()
+
 /******************************************************************
  * Function: char get_finger(int note)
  * Simple conversion from MIDI notes to finger indices. Per default,
@@ -7,17 +9,26 @@
  * @return: finger index between -1 (out of range) and 7
  ******************************************************************/
 char get_finger(int note){
-  switch (note){
-  case 60: return 0;
-  case 62: return 1;
-  case 64: return 2;
-  case 65: return 3;
-  case 67: return 4;
-  case 69: return 5;
-  case 71: return 6;
-  case 72: return 7;
-  default: return -1;
+  int i = 0;
+  while (i < 8){
+    if (note == note2finger[i]){
+      return i;
+    }
+    ++i;
   }
+  return -1;
+
+  /* switch (note){ */
+  /* case 60: return 0; */
+  /* case 62: return 1; */
+  /* case 64: return 2; */
+  /* case 65: return 3; */
+  /* case 67: return 4; */
+  /* case 69: return 5; */
+  /* case 71: return 6; */
+  /* case 72: return 7; */
+  /* default: return -1; */
+  /* } */
 }
 
 /******************************************************************
@@ -74,9 +85,6 @@ void restore_params(int serial){
 void dump_params(int serial){
   char params[256];  
 
-  // FIXME
-  char config_file[32] = "keybot.conf";
-
   serialport_writebyte(serial, DUMP);
   usleep(1000);
   int n = serialport_read_until(serial, params, DUMP_EOF, 256, 1000);
@@ -86,12 +94,12 @@ void dump_params(int serial){
   }
 
   FILE *myFile;
-  myFile = fopen(config_file, "w");
+  myFile = fopen(mubot_options.config_file, "w");
   if (myFile == NULL) {
-    printf("Error writing file '%s'\n", config_file);
+    printf("Error writing file '%s'\n", mubot_options.config_file);
     exit (1);
   }
-  printf ("\rSaving parameters to config file '%s'\n", config_file);
+  printf ("\rSaving parameters to config file '%s'\n", mubot_options.config_file);
 
   unsigned i=0;
   for (i=0; i<8; ++i){
@@ -103,8 +111,6 @@ void dump_params(int serial){
   printf ("Done.\n");
 
   fclose(myFile);
-  // flush serial
-  // serialport_read_until(serial, params, DUMP_EOF, 256, 1000);  
 }
 
 
@@ -173,3 +179,32 @@ int keybot_event(snd_seq_event_t *ev, int serial){
   return stop;
 }
 
+
+int is_white_key(int note){
+  int key = note % 12;
+  return key == 0 || key == 2 || key == 4 || key == 5 ||
+    key == 7 || key == 9 || key == 11;    
+}
+
+void keybot_setup(int serial){
+  if (mubot_options.restore){
+    restore_params(serial);
+  }
+
+  // initalize finger map with 8 white keys starting from base note
+  int i = 0;
+  int note = mubot_options.base_note;
+  while (i < 8){
+    if (is_white_key(note)){
+      note2finger[i] = note;
+      ++i;
+    }
+    ++note;
+  }
+}
+
+void keybot_terminate(int serial){
+  if (mubot_options.store){
+    dump_params(serial);
+  }
+}

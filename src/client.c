@@ -23,9 +23,15 @@ ClientType probe(int serial) {
   } else if (answer[0] == KEYBOT){
     printf("Detected KEYBOT\n");
     t = KEYBOT;
-  } else if (answer[0] == DRUMBOT){
-    printf("Detected DRUMBOT\n");
-    t = DRUMBOT;
+  } else if (answer[0] == BDBOT){
+    printf("Detected BASS DRUM BOT\n");
+    t = BDBOT;
+  } else if (answer[0] == SNAREBOT){
+    printf("Detected SNARE DRUM BOT\n");
+    t = SNAREBOT;
+  } else if (answer[0] == FISHBOT){
+    printf("Detected FISHBOT\n");
+    t = FISHBOT;
   } else {
     printf("Unknown client ID: %i\n", answer[0]);
   }
@@ -52,7 +58,8 @@ void detect_clients(){
   dp = opendir ("/dev/");
   if (dp != NULL) {
     while (ep = readdir (dp)) {
-      if (starts_with(ep->d_name, "ttyACM")){
+      if (starts_with(ep->d_name, "ttyACM") ||
+	  starts_with(ep->d_name, "ttyUSB")){
 	char dev[256];
 	sprintf(dev, "/dev/%s", ep->d_name);
 	int serial = open_serial(dev, 9600);
@@ -65,10 +72,20 @@ void detect_clients(){
 	  clients[nclients].serial = serial;
 	  clients[nclients].port = open_port("KeyBot IN");
 	  nclients++;
-	} else if (t == DRUMBOT){
-	  clients[nclients].type = DRUMBOT;
+	} else if (t == BDBOT){
+	  clients[nclients].type = BDBOT;
 	  clients[nclients].serial = serial;
-	  clients[nclients].port = open_port("DrumBot IN");
+	  clients[nclients].port = open_port("BassDrumBot IN");
+	  nclients++;	 
+	} else if (t == SNAREBOT){
+	  clients[nclients].type = SNAREBOT;
+	  clients[nclients].serial = serial;
+	  clients[nclients].port = open_port("SnareDrumBot IN");
+	  nclients++;	 
+	} else if (t == FISHBOT){
+	  clients[nclients].type = FISHBOT;
+	  clients[nclients].serial = serial;
+	  clients[nclients].port = open_port("FishBot IN");
 	  nclients++;	 
 	}
       }
@@ -80,23 +97,32 @@ void detect_clients(){
 }
 
 
-/*   ClientType t = NOBODY; */
-/*   serialport_writebyte(serial, WHORU); */
-/*   usleep(1000); */
-/*   char answer[32]; */
-/*   int n = serialport_read_until(serial, answer, DUMP_EOF, 3, 5000); */
+void terminate_clients(){
+  int i;
+  for (i=0; i<nclients; ++i){
+    ClientType t = clients[i].type;
+    if (t == KEYBOT){
+      keybot_terminate(clients[i].serial);
+    } else if (t == BDBOT){
+      // skip
+    } else if (t == SNAREBOT){
+      // skip
+    }
+    close_serial(clients[i].serial);
+  }
+}
 
-/*   if (n < 2 || answer[0] != IAM){ */
-/*     printf("No known client connected to device '%s' (%i,%c)\n", dev, n, answer[0]); */
-/*     t = NOBODY; */
-/*   } else if (answer[1] == KEYBOT){ */
-/*     printf("Detected KEYBOT connected to device '%s'\n", dev); */
-/*     t = KEYBOT; */
-/*   } else if (answer[1] == DRUMBOT){ */
-/*     printf("Detected DRUMBOT connected to device '%s'\n", dev); */
-/*     t = DRUMBOT; */
-/*   } */
 
-/*   close_serial(serial); */
-/*   return t; */
-/* } */
+void setup_clients(){
+  int i;
+  for (i=0; i<nclients; ++i){
+    ClientType t = clients[i].type;
+    if (t == KEYBOT){
+      keybot_setup(clients[i].serial);
+    } else if (t == BDBOT){
+      // skip
+    } else if (t == SNAREBOT){
+      // skip
+    }
+  }
+}

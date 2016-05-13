@@ -28,13 +28,22 @@ int  brate = 9600;      // baud rate for serial
 // will be set when ctrl-c is intercepted
 int sig_exit = 0;
 
-// signal handler for ctrl-c
-void intHandler(int dummy) {
-
-  // FIXME: Clean up here
-  sig_exit = 1;
+/******************************************************************
+ * Function: cleanup()
+ * Properly terminate clients (storing parameters...), closing
+ * serial ports and ALSA sequencer.
+ ******************************************************************/
+void cleanup(){
+  terminate_clients();
+  snd_seq_close(seq_handle);
+  printf("\rGood bye!                                       \n");
 }
 
+// signal handler for ctrl-c
+void intHandler(int dummy) {
+  cleanup();
+  exit(0);
+}
 
 /******************************************************************
  * Function: usage()
@@ -45,6 +54,7 @@ void usage(){
   printf (" -d dev  \tdevice for serial connection to arduino (default /dev/ttyACM*)\n");
   printf (" -b int  \tbaud rate for serial connection (default 57600)\n");
   printf (" -c chan \tMIDI channel to listen on (default all)\n");
+  printf (" -n note \tMIDI code of base note (default 48)\n");
   printf (" -r      \trestore params from config file on startup (default off)\n");
   printf (" -s      \tstore params to config file on exit (default off)\n");
   printf (" -f file \tuse config file for params (default keybot.conf)\n");
@@ -97,6 +107,21 @@ void parse_args(int argc, char* argv[]) {
 	exit(1);
       }
       mubot_options.midi_chan = c;
+      ++i;
+      continue;
+    } else if (!strcmp(argv[i], "-n")){
+      ++i;
+      if (i>=argc){
+	printf ("ERROR: missing argument for -n option\n");
+	usage();
+	exit(1);
+      }
+      int note = atoi(argv[i]);
+      if (note < 0 || note > 119){
+	printf("ERROR: illegal base note: %i\n", note);
+	exit(1);
+      }
+      mubot_options.base_note = note;
       ++i;
       continue;
     } else if (!strcmp(argv[i], "-r")){
@@ -152,13 +177,8 @@ int main(int argc, char *argv[]) {
     printf("ERROR: Could not detect any client devices.\n");
     exit(-1);
   }
-
-  if (mubot_options.restore){
-    restore_params(clients[0].serial);
-  }
-
-  // set signal handler for ctrl-c
-  // signal(SIGINT, intHandler);
+  setup_clients();
+  signal(SIGINT, intHandler);
 
   // main loop processing MIDI events
   printf("Let us hear some muzak!\n");
@@ -168,13 +188,6 @@ int main(int argc, char *argv[]) {
     }  
   }
 
-  if (mubot_options.store){
-    dump_params(clients[0].serial);
-  }
-
-  // clean up
-  close_serial(clients[0].serial);
-  snd_seq_close(seq_handle);
-  printf("\rGood bye!                                       \n");
+  cleanup();
   exit(0);
 }

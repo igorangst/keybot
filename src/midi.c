@@ -96,8 +96,11 @@ int midi_action(snd_seq_t *seq_handle) {
 	if (t == KEYBOT){
 	  stop =  keybot_event(ev, serial);
 	  break;
-	} else  if (t == DRUMBOT){
+	} else  if (t == BDBOT || t == SNAREBOT){
 	  stop = drumbot_event(ev, serial);
+	  break;
+	} else if (t == FISHBOT){
+	  stop = fishbot_event(ev, serial);
 	  break;
 	}
       }

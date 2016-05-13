@@ -8,4 +8,5 @@ void default_options() {
   mubot_options.lock_controls = 0;
   mubot_options.store = 0;
   mubot_options.restore = 0;
+  mubot_options.base_note = 48;
 }

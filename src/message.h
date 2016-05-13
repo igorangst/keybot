@@ -16,7 +16,9 @@ enum KeybotMessage {
 
 typedef enum {
   KEYBOT   = 0x01 , 
-  DRUMBOT  = 0x02 ,
+  BDBOT    = 0x02 ,
+  SNAREBOT = 0x03 ,
+  FISHBOT  = 0x04 ,
   NOBODY   = 0xff
 } ClientType;
 

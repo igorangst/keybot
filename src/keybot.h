@@ -5,6 +5,8 @@
 #include "midi.h"
 #include "options.h"
 
-int keybot_event(snd_seq_event_t *ev, int serial);
+int  keybot_event(snd_seq_event_t *ev, int serial);
+void keybot_setup(int serial);
+void keybot_terminate(int serial);
 
 #endif

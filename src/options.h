@@ -9,6 +9,7 @@ typedef struct{
   int lock_controls;       // lock params and ignore MIDI controller messages
   int store;               // store parameters on exit
   int restore;             // restore parameters on startup
+  int base_note;           // lowest note for keybot (MIDI code)
 } MubotOptions;
 
 extern MubotOptions mubot_options;

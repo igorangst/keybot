@@ -13,11 +13,11 @@ typedef struct
   ClientType type; // keybot, drumbot, ...
 } MubotClient;
 
-ClientType probe(int serial);
-void       init_clients();
-void       detect_clients();
+extern int         nclients;   // number of active clients
+extern MubotClient clients[8]; // global array of clients
 
-extern int         nclients;
-extern MubotClient clients[8];
+void       detect_clients();
+void       setup_clients();
+void       terminate_clients();
 
 #endif
