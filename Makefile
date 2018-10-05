@@ -1,10 +1,12 @@
 CC=gcc
+#CFLAGS=-O1 -Werror -Wall
+CFLAGS=-g -Werror -Wall
 LIBS=-lasound arduino-serial/arduino-serial-lib.o
 INCL=-Iarduino-serial -Isrc
 
 EXEC=bin/mubot
 MAIN=src/main.c
-SRCS=src/keybot.c src/drumbot.c src/fishbot.c src/midi.c src/options.c src/client.c src/serial.c
+SRCS=src/keybot.c src/drumbot.c src/fishbot.c src/dummybot.c src/midi.c src/options.c src/client.c src/serial.c
 OBJS=$(subst .c,.o,$(SRCS))
 CONFIG=~/.keybot/config
 
@@ -13,13 +15,13 @@ default all: mubot
 mubot: dirs arduino-serial/checkout $(SRC) exec
 
 exec: $(MAIN) $(OBJS)
-	$(CC) -o $(EXEC) $(INCL) $(MAIN) $(OBJS) $(LIBS)
+	$(CC) $(CFLAGS) -o $(EXEC) $(INCL) $(MAIN) $(OBJS) $(LIBS)
 
 dirs:
 	mkdir -p bin
 
-%.o: %.c
-	$(CC) -c -o $@ $< $(INCL)
+%.o: %.c %.h
+	$(CC) $(CFLAGS) -c -o $@ $< $(INCL)
 
 arduino-serial/checkout:
 	git submodule init

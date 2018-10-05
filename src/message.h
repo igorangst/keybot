@@ -19,6 +19,7 @@ typedef enum {
   BDBOT    = 0x02 ,
   SNAREBOT = 0x03 ,
   FISHBOT  = 0x04 ,
+  DUMMYBOT = 0xaa ,
   NOBODY   = 0xff
 } ClientType;
 

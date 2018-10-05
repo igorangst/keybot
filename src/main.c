@@ -19,14 +19,17 @@
 #include <midi.h>
 #include <keybot.h>
 
-// ======================================================={ global options
-char dev[256];          // serial device, default is "/dev/ttyACM0"
-int  brate = 9600;      // baud rate for serial 
-// ========================================================}
+// baud rate for serial 
+int  brate = 9600;      
 
+// add a dummy client for debugging purposes
+int dummy = 0;
 
 // will be set when ctrl-c is intercepted
 int sig_exit = 0;
+
+// ALSA interface
+snd_seq_t *seq_handle = 0;
 
 /******************************************************************
  * Function: cleanup()
@@ -77,7 +80,7 @@ void parse_args(int argc, char* argv[]) {
 	usage();
 	exit(1);
       }
-      strcpy(dev, argv[i]);
+      add_device(argv[i]);
       ++i;
       continue;
     } else if (!strcmp(argv[i], "-b")){
@@ -149,6 +152,10 @@ void parse_args(int argc, char* argv[]) {
     } else if (!strcmp(argv[i], "-h")){
       usage();
       exit(0);
+    } else if (!strcmp(argv[i], "-D")){
+        dummy = 1;
+        ++i;
+        continue;
     }
     printf ("ERROR: unknown option or command line argument '%s'\n", argv[i]);
     usage();
@@ -164,29 +171,40 @@ void parse_args(int argc, char* argv[]) {
 int main(int argc, char *argv[]) {
 
   // set default values and parse command line arguments
-  strcpy(dev, "/dev/ttyACM0");
   default_options();
   parse_args(argc, argv);
 
   // setup ALSA
-  init_alsa();
+  seq_handle = init_alsa();
 
   // connect to clients
   detect_clients();
+  if (dummy) {
+      clients[nclients].type = DUMMYBOT;
+      nclients++;
+  }
   if (nclients == 0){
     printf("ERROR: Could not detect any client devices.\n");
     exit(-1);
   }
   setup_clients();
+  create_ports(seq_handle);
   signal(SIGINT, intHandler);
+
+  // prepare polling
+  int npfd = snd_seq_poll_descriptors_count(seq_handle, POLLIN);
+  struct pollfd *pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
+  snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
 
   // main loop processing MIDI events
   printf("Let us hear some muzak!\n");
   while (!sig_exit) {
-    if (poll(pfd, npfd, 100000) > 0) {
-      if (midi_action(seq_handle)) break;
-    }  
+      int n = poll(pfd, npfd, 1000); 
+      if (n > 0) {
+          if (midi_action(seq_handle)) break;
+      }
   }
+  printf("Furz!\n");
 
   cleanup();
   exit(0);

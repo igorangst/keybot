@@ -1,4 +1,5 @@
 #include "fishbot.h"
+#include "arduino-serial-lib.h"
 
 /******************************************************************
  * Function: char get_chime(int note)

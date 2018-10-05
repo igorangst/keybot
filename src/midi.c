@@ -1,11 +1,6 @@
 #include "midi.h"
 #include "client.h"
 
-snd_seq_t     *seq_handle = 0;
-struct pollfd *pfd = 0;
-int            npfd = 0;
-
-
 /******************************************************************
  * Function: snd_seq_t *open_seq()
  * Open connection to ALSA sequncer, used for all MIDI handling.
@@ -19,28 +14,28 @@ snd_seq_t *open_seq() {
     exit(1);
   }
   snd_seq_set_client_name(seq_handle, "Arduino MuBot");
-  return(seq_handle);
+  return seq_handle;
 }
 
-int open_port(const char *name){
+int open_port(snd_seq_t *seq_handle, const char *name){
   int portid;
 
-  if ((portid = snd_seq_create_simple_port(seq_handle, name,
-            SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
-            SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
-    fprintf(stderr, "Error creating sequencer port.\n");
-    return -1;
+  if ((portid =
+       snd_seq_create_simple_port(seq_handle, name,
+                                  SND_SEQ_PORT_CAP_WRITE |
+                                  SND_SEQ_PORT_CAP_SUBS_WRITE,
+                                  SND_SEQ_PORT_TYPE_MIDI_GENERIC)) < 0) {
+      fprintf(stderr, "Error creating sequencer port.\n");
+      return -1;
   }
   return portid;
 }
 
-void init_alsa(){
-  seq_handle = open_seq(); 
-  snd_seq_drop_input(seq_handle);
-  npfd = snd_seq_poll_descriptors_count(seq_handle, POLLIN);
-  pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
-  snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
-  printf("Connected to ALSA sequencer.\n");
+snd_seq_t* init_alsa(){
+    snd_seq_t *seq_handle = open_seq(); 
+    snd_seq_drop_input(seq_handle);
+    printf("Connected to ALSA sequencer.\n");
+    return seq_handle;
 }
 
 
@@ -102,9 +97,13 @@ int midi_action(snd_seq_t *seq_handle) {
 	} else if (t == FISHBOT){
 	  stop = fishbot_event(ev, serial);
 	  break;
-	}
+	} else if (t == DUMMYBOT){
+            stop = dummybot_event(ev);
+            break;
+        }
       }
     }
+    snd_seq_free_event(ev);
   } while (!stop && snd_seq_event_input_pending(seq_handle, 0) > 0);
   
   return stop; 

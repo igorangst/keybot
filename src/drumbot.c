@@ -1,4 +1,5 @@
 #include "drumbot.h"
+#include "arduino-serial-lib.h"
 
 int drumbot_event(snd_seq_event_t *ev, int serial){
   int stop = 0;

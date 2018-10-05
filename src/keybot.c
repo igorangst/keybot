@@ -1,4 +1,5 @@
 #include "keybot.h"
+#include "arduino-serial-lib.h"
 
 char note2finger[8]; // will be initialized in setup_keybot()
 
@@ -51,7 +52,9 @@ void restore_params(int serial){
     exit (1);
   }
   for (i = 0; i < 16; i++) {
-    fscanf(myFile, "%d,", &numberArray[i] );
+      int n = fscanf(myFile, "%d,", &numberArray[i] );
+      if (n == 0)
+          break;
   }
   printf ("\rRestoring parameters from config file '%s'\n", mubot_options.config_file);
   for (i = 0; i < 8; i++) {

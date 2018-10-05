@@ -1,0 +1,2 @@
+default all:
+	cd .. && make

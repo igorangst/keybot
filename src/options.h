@@ -3,7 +3,7 @@
 
 #include <string.h>
 
-typedef struct{
+typedef struct {
   int midi_chan;           // 0 == all channels
   char config_file[256];   // default is "keybot.conf"
   int lock_controls;       // lock params and ignore MIDI controller messages
@@ -12,8 +12,15 @@ typedef struct{
   int base_note;           // lowest note for keybot (MIDI code)
 } MubotOptions;
 
-extern MubotOptions mubot_options;
+struct Device {
+    char file[256];
+    struct Device *next;
+};
 
-void default_options(); 
+extern MubotOptions mubot_options;
+extern struct Device *devs;
+
+void default_options(void);
+void add_device(const char*);
 
 #endif
