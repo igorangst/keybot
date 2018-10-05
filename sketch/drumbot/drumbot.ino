@@ -297,14 +297,15 @@ void loop() {
    event = 0;
    
    if (message == NOTE_ON) {
-     if (chan == 0 && !activeA ||
-         chan == 1 && activeB && !activeA){
+ //    if (chan == 0 && !activeA ||
+ //        chan == 1 && activeB && !activeA){
+     if (!activeA) {
        activeA = 1;
-       chan = 1;
+ //      chan = 1;
        beatA();  
      } else if (!activeB) {
        activeB = 1;
-       chan = 0;
+//       chan = 0;
        beatB();
      } else {
        // FIXME: lost beat 
